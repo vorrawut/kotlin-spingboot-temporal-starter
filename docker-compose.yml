@@ -1,0 +1,69 @@
+# This is used for local development
+version: "3.5"
+
+services:
+  # PostgreSQL service for Temporal persistence
+  postgresql:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    ports:
+      - "5432:5432"
+    networks:
+      - temporal-demo-network
+
+  # Temporal service with PostgreSQL
+  temporal:
+    image: temporalio/auto-setup:1.19.1
+    container_name: temporal
+    depends_on:
+      - postgresql
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgresql
+    networks:
+      - temporal-demo-network
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:7233" ]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+      timeout: 5s
+
+  # Temporal Admin Tools
+  temporal-admin-tools:
+    image: temporalio/admin-tools:1.25
+    container_name: temporal-admin-tools
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    networks:
+      - temporal-demo-network
+    stdin_open: true
+    tty: true
+
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:2.31.2
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    networks:
+      - temporal-demo-network
+    ports:
+      - "8089:8080"
+
+networks:
+  temporal-demo-network:
+    driver: bridge
+    name: temporal-demo-network
